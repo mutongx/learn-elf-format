@@ -63,9 +63,9 @@ class StructReader:
 class ELFIdentification(StructReader):
     FIELD_MAPPING = [
         ("magic", 4, None),
-        ("word_size", 1, "<b"),
-        ("endianness", 1, "<b"),
-        ("ident_version", 1, "<b"),
+        ("elf_class", 1, "<b"),
+        ("data_encoding", 1, "<b"),
+        ("header_version", 1, "<b"),
         ("os_abi", 1, "<b"),
         ("os_abi_version", 1, "<b"),
         ("padding", 7, None),
@@ -76,7 +76,7 @@ class ELF64Header(StructReader):
     FIELD_MAPPING = ELFIdentification.FIELD_MAPPING + [
         ("object_type", 2, "<h"),
         ("architecture", 2, "<h"),
-        ("version", 4, "<l"),
+        ("object_version", 4, "<l"),
         ("entry_address", 8, "<q"),
         ("program_header_offset", 8, "<1"),
         ("section_header_offset", 8, "<1"),
@@ -117,9 +117,9 @@ def main(file_path: str):
         ident = f.identification
         if ident.magic != b"\x7fELF":
             raise RuntimeError("invalid ELF magic")
-        if ident.word_size != 2:
+        if ident.elf_class != 2:
             raise RuntimeError("only 64-bit ELF file is supported")
-        if ident.endianness != 1:
+        if ident.data_encoding != 1:
             raise RuntimeError("only little-endian ELF file is supported")
         if ident.ident_version != 1:
             raise RuntimeError("invalid ELF identification version")
