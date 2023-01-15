@@ -109,17 +109,44 @@ class ELF64Header(StructReader):
     ]
 
 
+class ELF64ProgramHeader(StructReader):
+    FIELD_MAPPING = [
+        ("type", 4, "<l"),
+        ("flags", 4, "<l"),
+        ("offset", 8, "<q"),
+        ("virtual_address", 8, "<q"),
+        ("physical_address", 8, "<q"),
+        ("size", 8, "<q"),
+        ("memory_size", 8, "<q"),
+        ("alignment", 8, "<q"),
+    ]
+
+
+class ELF64Program:
+    def __init__(self, header: ELF64ProgramHeader, data: MmapSlice) -> None:
+        self._header = header
+        self._data = data
+
+    @property
+    def header(self):
+        return self._header
+
+    @property
+    def data(self):
+        return self._data
+
+
 class ELF64SectionHeader(StructReader):
     FIELD_MAPPING = [
         ("name", 4, "<l"),
         ("type", 4, "<l"),
         ("flags", 8, "<q"),
-        ("address", 8, "<q"),
+        ("virtual_address", 8, "<q"),
         ("offset", 8, "<q"),
         ("size", 8, "<q"),
         ("link", 4, None),
         ("info", 4, None),
-        ("address_alignment", 8, "<q"),
+        ("alignment", 8, "<q"),
         ("entry_size", 8, "<q"),
     ]
 
@@ -164,6 +191,27 @@ class ELFFile:
     def header(self):
         return ELF64Header(MmapSlice(self._mmap, 0, 64))
 
+    def get_program_header(self, index: int):
+        header_size = self.header.program_header_size
+        header_count = self.header.program_header_count
+        header_offset = self.header.program_header_offset
+        assert isinstance(header_size, int)
+        assert isinstance(header_count, int)
+        assert isinstance(header_offset, int)
+        if index >= header_count:
+            raise ValueError("invalid program index")
+        header = MmapSlice(self._mmap, header_offset + index * header_size, header_size)
+        return ELF64ProgramHeader(header)
+
+    def get_program(self, index: int):
+        program_header = self.get_program_header(index)
+        program_offset = program_header.offset
+        program_size = program_header.size
+        assert isinstance(program_offset, int)
+        assert isinstance(program_size, int)
+        program_data = MmapSlice(self._mmap, program_offset, program_size)
+        return ELF64Program(program_header, program_data)
+
     def get_section_header(self, index: int):
         header_size = self.header.section_header_size
         header_count = self.header.section_header_count
@@ -189,7 +237,7 @@ class ELFFile:
         if isinstance(index_or_name, int):
             section_index = index_or_name
             section_header = self.get_section_header(section_index)
-        section_name_offset = section_header.name
+            section_name_offset = section_header.name
             assert isinstance(section_name_offset, int)
             section_name = strtab.get(section_name_offset)
         else:
