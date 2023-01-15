@@ -172,14 +172,13 @@ class ELFFile:
         assert isinstance(header_count, int)
         assert isinstance(header_offset, int)
         if index >= header_count:
-            raise ValueError("invalid section header index")
+            raise ValueError("invalid section index")
         header = MmapSlice(self._mmap, header_offset + index * header_size, header_size)
         return ELF64SectionHeader(header)
 
-    def get_section(self, index: int):
+    def get_section(self, index_or_name: Union[int, str]):
         strtab_index = self.header.section_header_index
         assert isinstance(strtab_index, int)
-
         strtab_header = self.get_section_header(strtab_index)
         strtab_offset = strtab_header.offset
         strtab_size = strtab_header.size
@@ -187,17 +186,31 @@ class ELFFile:
         assert isinstance(strtab_size, int)
         strtab = StringTable(MmapSlice(self._mmap, strtab_offset, strtab_size))
 
-        section_header = self.get_section_header(index)
+        if isinstance(index_or_name, int):
+            section_index = index_or_name
+            section_header = self.get_section_header(section_index)
         section_name_offset = section_header.name
+            assert isinstance(section_name_offset, int)
+            section_name = strtab.get(section_name_offset)
+        else:
+            section_count = self.header.section_header_count
+            assert isinstance(section_count, int)
+            for section_index in range(section_count):
+                section_header = self.get_section_header(section_index)
+                section_name_offset = section_header.name
+                assert isinstance(section_name_offset, int)
+                section_name = strtab.get(section_name_offset)
+                if section_name == index_or_name:
+                    break
+            else:
+                raise ValueError(f"invalid section name")
+
         section_offset = section_header.offset
         section_size = section_header.size
-        assert isinstance(section_name_offset, int)
         assert isinstance(section_offset, int)
         assert isinstance(section_size, int)
 
-        section_name = strtab.get(section_name_offset)
         section_data = MmapSlice(self._mmap, section_offset, section_size)
-
         return ELF64Section(section_name, section_header, section_data)
 
 
