@@ -90,6 +90,40 @@ class ELF64Header(StructReader):
     ]
 
 
+class ELF64SectionHeader(StructReader):
+    FIELD_MAPPING = [
+        ("name", 4, "<l"),
+        ("type", 4, "<l"),
+        ("flags", 8, "<q"),
+        ("address", 8, "<q"),
+        ("offset", 8, "<q"),
+        ("size", 8, "<q"),
+        ("link", 4, None),
+        ("info", 4, None),
+        ("address_alignment", 8, "<q"),
+        ("entry_size", 8, "<q"),
+    ]
+
+
+class ELF64Section:
+    def __init__(self, name: str, header: ELF64SectionHeader, data: MmapSlice) -> None:
+        self._name = name
+        self._header = header
+        self._data = data
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def header(self):
+        return self._header
+
+    @property
+    def data(self):
+        return self._data
+
+
 class ELFFile:
     def __init__(self, file_path: str):
         self._file_path = file_path
@@ -110,6 +144,18 @@ class ELFFile:
     @property
     def header(self):
         return ELF64Header(MmapSlice(self._mmap, 0, 64))
+
+    def get_section_header(self, index: int):
+        header_size = self.header.section_header_size
+        header_count = self.header.section_header_count
+        header_offset = self.header.section_header_offset
+        assert isinstance(header_size, int)
+        assert isinstance(header_count, int)
+        assert isinstance(header_offset, int)
+        if index >= header_count:
+            raise ValueError("invalid section header index")
+        header = MmapSlice(self._mmap, header_offset + index * header_size, header_size)
+        return ELF64SectionHeader(header)
 
 
 def main(file_path: str):
