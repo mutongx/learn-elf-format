@@ -46,7 +46,7 @@ class MmapSlice:
 
 
 class StructReader:
-    FIELD_MAPPING: List[Tuple[str, int, Optional[str]]] = []
+    FIELD_MAPPING: List[Tuple[str, int, Optional[str]]]
 
     def __init__(self, data: MmapSlice) -> None:
         self._data = data
@@ -69,7 +69,7 @@ class StructReader:
         return struct.unpack(format, self._data[offset : offset + size])[0]
 
 
-class StringTable:
+class StringTableReader:
     def __init__(self, data: MmapSlice) -> None:
         self._data = data
 
@@ -121,20 +121,6 @@ class ELF64ProgramHeader(StructReader):
     ]
 
 
-class ELF64Program:
-    def __init__(self, header: ELF64ProgramHeader, data: MmapSlice) -> None:
-        self._header = header
-        self._data = data
-
-    @property
-    def header(self):
-        return self._header
-
-    @property
-    def data(self):
-        return self._data
-
-
 class ELF64SectionHeader(StructReader):
     FIELD_MAPPING = [
         ("name", 4, "<l"),
@@ -148,6 +134,20 @@ class ELF64SectionHeader(StructReader):
         ("alignment", 8, "<q"),
         ("entry_size", 8, "<q"),
     ]
+
+
+class ELF64Segment:
+    def __init__(self, header: ELF64ProgramHeader, data: MmapSlice) -> None:
+        self._header = header
+        self._data = data
+
+    @property
+    def header(self):
+        return self._header
+
+    @property
+    def data(self):
+        return self._data
 
 
 class ELF64Section:
@@ -202,20 +202,20 @@ class ELFFile:
         header = MmapSlice(self._mmap, header_offset + index * header_size, header_size)
         return ELF64ProgramHeader(header)
 
-    def get_program(self, index: int):
+    def get_segment(self, index: int):
         program_header = self.get_program_header(index)
-        program_offset = program_header.offset
-        program_size = program_header.size_in_file
-        assert isinstance(program_offset, int)
-        assert isinstance(program_size, int)
-        program_data = MmapSlice(self._mmap, program_offset, program_size)
-        return ELF64Program(program_header, program_data)
+        segment_offset = program_header.offset
+        segment_size = program_header.size_in_file
+        assert isinstance(segment_offset, int)
+        assert isinstance(segment_size, int)
+        segment_data = MmapSlice(self._mmap, segment_offset, segment_size)
+        return ELF64Segment(program_header, segment_data)
 
-    def iter_program(self) -> Iterable[ELF64Program]:
-        program_count = self.header.program_header_count
-        assert isinstance(program_count, int)
-        for index in range(program_count):
-            yield self.get_program(index)
+    def iter_segment(self) -> Iterable[ELF64Segment]:
+        segment_count = self.header.program_header_count
+        assert isinstance(segment_count, int)
+        for index in range(segment_count):
+            yield self.get_segment(index)
 
     def get_section_header(self, index: int):
         header_size = self.header.section_header_size
@@ -237,7 +237,7 @@ class ELFFile:
         strtab_size = strtab_header.size
         assert isinstance(strtab_offset, int)
         assert isinstance(strtab_size, int)
-        strtab = StringTable(MmapSlice(self._mmap, strtab_offset, strtab_size))
+        strtab = StringTableReader(MmapSlice(self._mmap, strtab_offset, strtab_size))
 
         if isinstance(index_or_name, int):
             section_index = index_or_name
