@@ -1,7 +1,8 @@
+import struct
 import sys
 import mmap
 from contextlib import ExitStack
-from typing import Union, List, Dict, Tuple, overload
+from typing import Union, Optional, List, Dict, Tuple, overload
 
 
 class MmapSlice:
@@ -36,16 +37,16 @@ class MmapSlice:
 
 
 class StructReader:
-    FIELD_MAPPING: List[Tuple[str, int]] = []
+    FIELD_MAPPING: List[Tuple[str, int, Optional[str]]] = []
 
     def __init__(self, data: MmapSlice) -> None:
         self._data = data
-        self._fields: Dict[str, Tuple[int, int]] = {}
+        self._fields: Dict[str, Tuple[int, int, Optional[str]]] = {}
         offset = 0
-        for name, size in self.FIELD_MAPPING:
+        for name, size, format in self.FIELD_MAPPING:
             if name in self._fields:
                 raise RuntimeError(f"duplicate field name: {name}")
-            self._fields[name] = (offset, size)
+            self._fields[name] = (offset, size, format)
             offset += size
         if offset != data.size:
             raise ValueError(
@@ -53,37 +54,39 @@ class StructReader:
             )
 
     def __getattr__(self, key: str) -> Union[bytes, int]:
-        offset, size = self._fields[key]
-        return self._data[offset : offset + size]
+        offset, size, format = self._fields[key]
+        if format is None:
+            return self._data[offset : offset + size]
+        return struct.unpack(format, self._data[offset : offset + size])[0]
 
 
 class ELFIdentification(StructReader):
     FIELD_MAPPING = [
-        ("magic", 4),
-        ("word_size", 1),
-        ("endianness", 1),
-        ("ident_version", 1),
-        ("os_abi", 1),
-        ("os_abi_version", 1),
-        ("padding", 7),
+        ("magic", 4, None),
+        ("word_size", 1, "<b"),
+        ("endianness", 1, "<b"),
+        ("ident_version", 1, "<b"),
+        ("os_abi", 1, "<b"),
+        ("os_abi_version", 1, "<b"),
+        ("padding", 7, None),
     ]
 
 
 class ELF64Header(StructReader):
     FIELD_MAPPING = ELFIdentification.FIELD_MAPPING + [
-        ("object_type", 2),
-        ("architecture", 2),
-        ("version", 4),
-        ("entry_address", 8),
-        ("program_header_offset", 8),
-        ("section_header_offset", 8),
-        ("flags", 4),
-        ("elf_header_size", 2),
-        ("program_header_size", 2),
-        ("program_header_count", 2),
-        ("section_header_size", 2),
-        ("section_header_count", 2),
-        ("section_header_index", 2),
+        ("object_type", 2, "<h"),
+        ("architecture", 2, "<h"),
+        ("version", 4, "<l"),
+        ("entry_address", 8, "<q"),
+        ("program_header_offset", 8, "<1"),
+        ("section_header_offset", 8, "<1"),
+        ("flags", 4, None),
+        ("elf_header_size", 2, "<h"),
+        ("program_header_size", 2, "<h"),
+        ("program_header_count", 2, "<h"),
+        ("section_header_size", 2, "<h"),
+        ("section_header_count", 2, "<h"),
+        ("section_header_index", 2, "<h"),
     ]
 
 
@@ -114,11 +117,11 @@ def main(file_path: str):
         ident = f.identification
         if ident.magic != b"\x7fELF":
             raise RuntimeError("invalid ELF magic")
-        if ident.word_size != b"\x02":
+        if ident.word_size != 2:
             raise RuntimeError("only 64-bit ELF file is supported")
-        if ident.endianness != b"\x01":
+        if ident.endianness != 1:
             raise RuntimeError("only little-endian ELF file is supported")
-        if ident.ident_version != b"\x01":
+        if ident.ident_version != 1:
             raise RuntimeError("invalid ELF identification version")
 
 
