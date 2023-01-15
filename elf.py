@@ -1,5 +1,4 @@
 import struct
-import sys
 import mmap
 from contextlib import ExitStack
 from typing import Union, Optional, Iterable, List, Dict, Tuple, overload
@@ -272,21 +271,3 @@ class ELFFile:
         assert isinstance(section_count, int)
         for index in range(section_count):
             yield self.get_section(index)
-
-
-def main(file_path: str):
-    with ELFFile(file_path) as f:
-        ident = f.identification
-        if ident.magic != b"\x7fELF":
-            raise RuntimeError("invalid ELF magic")
-        if ident.elf_class != 2:
-            raise RuntimeError("only 64-bit ELF file is supported")
-        if ident.data_encoding != 1:
-            raise RuntimeError("only little-endian ELF file is supported")
-        if ident.header_version != 1:
-            raise RuntimeError("invalid ELF identification version")
-
-
-if __name__ == "__main__":
-    file_path = sys.argv[1]
-    main(file_path)
