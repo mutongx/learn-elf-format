@@ -1,7 +1,7 @@
 import sys
 import mmap
 from contextlib import ExitStack
-from typing import Union
+from typing import Union, List, Dict, Tuple, overload
 
 
 class MmapSlice:
@@ -10,7 +10,15 @@ class MmapSlice:
         self._offset = offset
         self._size = size
 
-    def __getitem__(self, index: Union[slice, int]):
+    @overload
+    def __getitem__(self, __i: int) -> int:
+        ...
+
+    @overload
+    def __getitem__(self, __s: slice) -> bytes:
+        ...
+
+    def __getitem__(self, index: Union[int, slice]):
         if isinstance(index, slice):
             start = index.start if index.start is not None else 0
             stop = index.stop if index.stop is not None else self._size
@@ -21,6 +29,32 @@ class MmapSlice:
         if self._offset + offset + size > self._offset + self._size:
             raise ValueError("required slice exceeds actual size")
         return MmapSlice(self._mmap, self._offset + offset, size)
+
+    @property
+    def size(self):
+        return self._size
+
+
+class StructReader:
+    FIELD_MAPPING: List[Tuple[str, int]] = []
+
+    def __init__(self, data: MmapSlice) -> None:
+        self._data = data
+        self._fields: Dict[str, Tuple[int, int]] = {}
+        offset = 0
+        for name, size in self.FIELD_MAPPING:
+            if name in self._fields:
+                raise RuntimeError(f"duplicate field name: {name}")
+            self._fields[name] = (offset, size)
+            offset += size
+        if offset != data.size:
+            raise ValueError(
+                f"size of data ({data.size}) does not match with FIELD_MAPPING definition"
+            )
+
+    def __getattr__(self, key: str) -> Union[bytes, int]:
+        offset, size = self._fields[key]
+        return self._data[offset : offset + size]
 
 
 class ELFFile:
