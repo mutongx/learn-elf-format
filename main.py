@@ -121,7 +121,7 @@ def main(file_path: str):
             raise RuntimeError("only 64-bit ELF file is supported")
         if ident.data_encoding != 1:
             raise RuntimeError("only little-endian ELF file is supported")
-        if ident.ident_version != 1:
+        if ident.header_version != 1:
             raise RuntimeError("invalid ELF identification version")
 
 
