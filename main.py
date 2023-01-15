@@ -2,7 +2,7 @@ import struct
 import sys
 import mmap
 from contextlib import ExitStack
-from typing import Union, Optional, List, Dict, Tuple, overload
+from typing import Union, Optional, Iterable, List, Dict, Tuple, overload
 
 
 class MmapSlice:
@@ -212,6 +212,12 @@ class ELFFile:
         program_data = MmapSlice(self._mmap, program_offset, program_size)
         return ELF64Program(program_header, program_data)
 
+    def iter_program(self) -> Iterable[ELF64Program]:
+        program_count = self.header.program_header_count
+        assert isinstance(program_count, int)
+        for index in range(program_count):
+            yield self.get_program(index)
+
     def get_section_header(self, index: int):
         header_size = self.header.section_header_size
         header_count = self.header.section_header_count
@@ -260,6 +266,12 @@ class ELFFile:
 
         section_data = MmapSlice(self._mmap, section_offset, section_size)
         return ELF64Section(section_name, section_header, section_data)
+
+    def iter_section(self) -> Iterable[ELF64Section]:
+        section_count = self.header.section_header_count
+        assert isinstance(section_count, int)
+        for index in range(section_count):
+            yield self.get_section(index)
 
 
 def main(file_path: str):
