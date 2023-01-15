@@ -116,8 +116,8 @@ class ELF64ProgramHeader(StructReader):
         ("offset", 8, "<q"),
         ("virtual_address", 8, "<q"),
         ("physical_address", 8, "<q"),
-        ("size", 8, "<q"),
-        ("memory_size", 8, "<q"),
+        ("size_in_file", 8, "<q"),
+        ("size_in_memory", 8, "<q"),
         ("alignment", 8, "<q"),
     ]
 
@@ -206,7 +206,7 @@ class ELFFile:
     def get_program(self, index: int):
         program_header = self.get_program_header(index)
         program_offset = program_header.offset
-        program_size = program_header.size
+        program_size = program_header.size_in_file
         assert isinstance(program_offset, int)
         assert isinstance(program_size, int)
         program_data = MmapSlice(self._mmap, program_offset, program_size)
